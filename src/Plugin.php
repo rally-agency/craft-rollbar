@@ -36,7 +36,10 @@ use yii\base\Event;
  * @package   Rollbar
  * @since     0.0.0
  *
+ * @property  array $rollbarConfig
+ * @property  array $rollbarJsConfig
  * @property  Settings $settings
+ *
  * @method    Settings getSettings()
  */
 class Plugin extends BasePlugin
@@ -71,50 +74,38 @@ class Plugin extends BasePlugin
         parent::init();
         self::$plugin = $this;
 
-        Craft::info(
-            Craft::t(
-                'newism-rollbar',
-                '{name} plugin loaded',
-                ['name' => $this->name]
-            ),
-            __METHOD__
-        );
+        $this->logPluginLoaded();
+        $this->registerServerLogger();
+        $this->registerJavascriptLogger();
+    }
 
-        if ($this->settings->accessToken) {
-            Event::on(
-                ErrorHandler::class,
-                ErrorHandler::EVENT_BEFORE_HANDLE_EXCEPTION,
-                function (ExceptionEvent $event) {
-                    Rollbar::init(
-                        [
-                            'access_token' => $this->settings->accessToken,
-                            'environment' => CRAFT_ENVIRONMENT,
-                        ]
-                    );
-                    Rollbar::error($event->exception);
-                }
-            );
-        }
+    /**
+     * Get Rollbar's configuration.
+     *
+     * @return array
+     */
+    public function getRollbarConfig(): array
+    {
+        return [
+            'access_token' => $this->settings->accessToken,
+            'environment' => CRAFT_ENVIRONMENT
+        ];
+    }
 
-        if($this->settings->enableJs && $this->settings->postClientItemAccessToken) {
-            // Load JS before template is rendered
-            Event::on(
-                View::class,
-                View::EVENT_BEFORE_RENDER_TEMPLATE,
-                function (TemplateEvent $event) {
-                    $view = Craft::$app->getView();
-                    $rollbarJsHelper = new RollbarJsHelper([
-                        'accessToken' => $this->settings->postClientItemAccessToken,
-                        'captureUncaught' => true,
-                        'payload' => [
-                            'environment' => CRAFT_ENVIRONMENT,
-                        ],
-                    ]);
-                    $rollbarJs = $rollbarJsHelper->configJsTag() . $rollbarJsHelper->jsSnippet();
-                    $view->registerJs($rollbarJs, View::POS_HEAD);
-                }
-            );
-        }
+    /**
+     * Get Rollbar's JS configuration
+     *
+     * @return array
+     */
+    public function getRollbarJsConfig(): array
+    {
+        return [
+            'accessToken' => $this->settings->postClientItemAccessToken,
+            'captureUncaught' => true,
+            'payload' => [
+                'environment' => CRAFT_ENVIRONMENT,
+            ],
+        ];
     }
 
     // Protected Methods
@@ -147,6 +138,64 @@ class Plugin extends BasePlugin
             [
                 'settings' => $this->getSettings(),
             ]
+        );
+    }
+
+    /**
+     * Register the Server's PHP logger.
+     *
+     * @return void
+     */
+    protected function registerServerLogger(): void
+    {
+        if ($this->settings->accessToken) {
+            Event::on(
+                ErrorHandler::class,
+                ErrorHandler::EVENT_BEFORE_HANDLE_EXCEPTION,
+                function (ExceptionEvent $event) {
+                    Rollbar::init($this->getRollbarConfig());
+                    Rollbar::error($event->exception);
+                }
+            );
+        }
+    }
+
+    /**
+     * Register the javascript logger.
+     *
+     * @return void
+     */
+    protected function registerJavascriptLogger(): void
+    {
+        if ($this->settings->enableJs && $this->settings->postClientItemAccessToken) {
+            // Load JS before template is rendered
+            Event::on(
+                View::class,
+                View::EVENT_BEFORE_RENDER_TEMPLATE,
+                function (TemplateEvent $event) {
+                    $view = Craft::$app->getView();
+                    $rollbarJsHelper = new RollbarJsHelper($this->getRollbarJsConfig());
+                    $rollbarJs = $rollbarJsHelper->configJsTag() . $rollbarJsHelper->jsSnippet();
+                    $view->registerJs($rollbarJs, View::POS_HEAD);
+                }
+            );
+        }
+    }
+
+    /**
+     * Log plugin loaded message.
+     *
+     * @return void
+     */
+    protected function logPluginLoaded(): void
+    {
+        Craft::info(
+            Craft::t(
+                'newism-rollbar',
+                '{name} plugin loaded',
+                ['name' => $this->name]
+            ),
+            __METHOD__
         );
     }
 }
