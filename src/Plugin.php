@@ -12,6 +12,7 @@ namespace newism\rollbar;
 
 use Craft;
 use craft\base\Plugin as BasePlugin;
+use craft\events\ErrorEvent;
 use craft\events\ExceptionEvent;
 use craft\events\TemplateEvent;
 use craft\web\ErrorHandler;
@@ -20,6 +21,7 @@ use newism\rollbar\models\Settings;
 use Rollbar\Rollbar;
 use Rollbar\RollbarJsHelper;
 use yii\base\Event;
+use yii\queue\Queue;
 
 
 /**
@@ -148,6 +150,7 @@ class Plugin extends BasePlugin
      */
     protected function registerServerLogger(): void
     {
+        // General exceptions
         if ($this->settings->accessToken) {
             Event::on(
                 ErrorHandler::class,
@@ -158,6 +161,16 @@ class Plugin extends BasePlugin
                 }
             );
         }
+
+        // Queue errors.
+        Event::on(
+            Queue::class,
+            Queue::EVENT_AFTER_ERROR,
+            function (ErrorEvent $event) {
+                Rollbar::init($this->getRollbarConfig());
+                Rollbar::error($event->exception);
+            }
+        );
     }
 
     /**
