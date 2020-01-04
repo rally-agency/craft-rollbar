@@ -122,6 +122,8 @@ class Plugin extends BasePlugin
 
     /**
      * Creates and returns the model used to store the plugin’s settings.
+     *
+     * @return Settings
      */
     protected function createSettingsModel(): Settings
     {
@@ -133,8 +135,10 @@ class Plugin extends BasePlugin
      * block on the settings page.
      *
      * @return string
-     * @throws \Twig_Error_Loader
-     * @throws \yii\base\Exception
+     *
+     * @throws \Twig\Error\LoaderError
+     * @throws \Twig\Error\RuntimeError
+     * @throws \Twig\Error\SyntaxError
      */
     protected function settingsHtml(): string
     {
